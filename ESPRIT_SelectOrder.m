@@ -1,0 +1,51 @@
+function [hat_f,hat_s]=ESPRIT_SelectOrder(y,G,Fs,range)
+N=length(y);
+y=reshape(y,[N,1]);
+y=hilbert(y);
+%%
+M=N+1-G;
+Sum=zeros(M,M);
+for i=1:G
+    Sum=Sum+y(i:i+M-1)*(y(i:i+M-1))';
+end
+hat_Ry=Sum/G;
+[T,lambda]=eig(hat_Ry);
+aa=diag(lambda);
+[~,p]=sort((diag(lambda)),'descend');
+T=T(:,p);
+for k=1:30
+    S=T(:,1:k);
+    S1=[eye(M-1),zeros(M-1,1)]*S;
+    S2=[zeros(M-1,1),eye(M-1)]*S;
+    SS=[S1,S2];
+    [~,~,V]=svd(SS);
+    V11=V(1:end/2,1:end/2);
+    V22=V(end/2+1:end,1:end/2);
+    Phi=V11*inv(V22);
+    [~,mu]=eig(Phi);
+    mu=diag(mu);
+    hat_f=angle(mu)/(2*pi/Fs);
+    hat_A=exp(2*pi*1j*hat_f*(0:M-1)/Fs).';
+    hat_s=inv(hat_A'*hat_A)*hat_A'*y(1:1+M-1);
+    A=exp(2*pi*1j*hat_f*(0:N-1)/Fs).';
+    e=y-A*hat_s;
+    h=e'*e/N;
+    cost(k)=N*log(h)+(3*k+1)*log(N);
+end
+O=find(cost==min(cost));
+O=O(1);
+S=T(:,1:O);
+S1=[eye(M-1),zeros(M-1,1)]*S;
+S2=[zeros(M-1,1),eye(M-1)]*S;
+SS=[S1,S2];
+[~,~,V]=svd(SS);
+V11=V(1:end/2,1:end/2);
+V22=V(end/2+1:end,1:end/2);
+Phi=V11*inv(V22);
+[~,mu]=eig(Phi);
+mu=diag(mu);
+hat_f=angle(mu)/(2*pi/Fs);
+hat_f(hat_f<range(1))=[];
+hat_f(hat_f>range(2))=[];
+hat_A=exp(2*pi*1j*hat_f*(0:M-1)/Fs).';
+hat_s=inv(hat_A'*hat_A)*hat_A'*y(1:1+M-1);
